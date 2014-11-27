@@ -56,10 +56,9 @@ class ImportwordpressCli extends JApplicationCli
 	{
 		parent::__construct();
 		$this->db = JFactory::getDbo();
-		/*
-		$this->app = JFactory::getApplication('site');
-		$this->app->initialise();
-		*/
+
+		// Set JFactory::$application object to avoid system using incorrect defaults
+		JFactory::$application = $this;
 	}
 
 	/**
@@ -155,7 +154,7 @@ class ImportwordpressCli extends JApplicationCli
 			if (!$duplicate)
 			{
 
-				$this->out((string) $item->title);
+				$this->out('Processing ' . (string) $item->title);
 
 				$table = JTable::getInstance('content', 'JTable');
 
