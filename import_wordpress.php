@@ -157,73 +157,44 @@ class ImportwordpressCli extends JApplicationCli
 
 				$this->out((string) $item->title);
 
+				$table = JTable::getInstance('content', 'JTable');
+
 				//return print_r($item, true);
 
 				$creator = $item->children('dc', true);
 				$date    = JFactory::getDate($item->pubDate);
 
-				$article                   = JTable::getInstance('content');
-				$article->access           = 1;
-				$article->alias            = JFilterOutput::stringURLSafe($item->title);
-				$article->catid            = $catId;
-				$article->created          = $date->toSQL();
-				$article->created_by       = $this->getAdminId();
-				$article->created_by_alias = (string) $creator;
-				$article->introtext        = (string) $item->description;
-				$article->language         = '*';
-				$article->metadata         = '{"robots":"","author":"","rights":"","xreference":"","tags":null}';
-				$article->publish_up       = JFactory::getDate()->toSql();
-				$article->publish_down     = $this->db->getNullDate();
-				$article->state            = 1;
-				$article->title            = (string) $item->title[0];
-				$article->version          = 1;
+				$article = array(
+					'access'           => 1,
+					'alias'            => JFilterOutput::stringURLSafe($item->title),
+					'catid'            => $catId,
+					'created'          => $date->toSQL(),
+					'created_by'       => $this->getAdminId(),
+					'created_by_alias' => (string) $creator,
+					'introtext'        => (string) $item->description,
+					'language'         => '*',
+					'metadata'         => '{"robots":"","author":"","rights":"","xreference":"","tags":null}',
+					'publish_up'       => JFactory::getDate()->toSql(),
+					'publish_down'     => $this->db->getNullDate(),
+					'state'            => 1,
+					'title'            => (string) $item->title[0],
+					'version'          => 1
+				);
 
 				try
 				{
-					$this->out('Checking ' . $article->title, true);
+					$this->out('Saving ' . $article['title'], true);
 
-					$article->check();
+					$table->save($article);
 				} catch (RuntimeException $e)
 				{
-					$this->out('Checking ' . $article->title . ' failed', true);
+					$this->out('Saving ' . $article['title'] . ' failed', true);
 
 					$this->out($e->getMessage(), true);
 					$this->close($e->getCode());
 				}
 
-				$this->out('Checking ' . $article->title . ' done', true);
-
-				try
-				{
-					$this->out('Storing ' . $article->title, true);
-
-					$article->store(true);
-				} catch (RuntimeException $e)
-				{
-					$this->out('Storing ' . $article->title . ' failed', true);
-
-					$this->out($e->getMessage(), true);
-					$this->close($e->getCode());
-				}
-
-				//$this->close('Storing ' . $article->title . ' done' . "\n", true);
-
-				/*
-				try
-				{
-					$this->out('Saving ' . $article->title, true);
-
-					$article->save(true);
-				} catch (RuntimeException $e)
-				{
-					$this->out('Saving ' . $article->title . ' failed', true);
-
-					$this->out($e->getMessage(), true);
-					$this->close($e->getCode());
-				}
-
-				$this->out('Saving ' . $article->title . ' done', true);
-				*/
+				$this->out('Saving ' . $article['title'] . ' done', true);
 			}
 		}
 	}
