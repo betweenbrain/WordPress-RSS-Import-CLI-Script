@@ -72,7 +72,7 @@ class ImportwordpressCli extends JApplicationCli
 	public function execute()
 	{
 		$xml = $this->getFeed('http://www.winkworth.co.uk/property-blog/feed/');
-		$this->out($this->saveItems($xml, 2));
+		$this->saveItems($xml, 2);
 	}
 
 	/**
@@ -155,7 +155,10 @@ class ImportwordpressCli extends JApplicationCli
 			if (!$duplicate)
 			{
 
+				$this->out((string) $item->title);
+
 				//return print_r($item, true);
+
 				$creator = $item->children('dc', true);
 				$date    = JFactory::getDate($item->pubDate);
 
@@ -177,25 +180,53 @@ class ImportwordpressCli extends JApplicationCli
 
 				try
 				{
+					$this->out('Checking ' . $article->title, true);
+
 					$article->check();
 				} catch (RuntimeException $e)
 				{
-					return $e->getMessage();
+					$this->out('Checking ' . $article->title . ' failed', true);
 
+					$this->out($e->getMessage(), true);
+					$this->close($e->getCode());
 				}
+
+				$this->out('Checking ' . $article->title . ' done', true);
+
 				try
 				{
+					$this->out('Storing ' . $article->title, true);
+
 					$article->store(true);
 				} catch (RuntimeException $e)
 				{
-					return $e->getMessage();
+					$this->out('Storing ' . $article->title . ' failed', true);
+
+					$this->out($e->getMessage(), true);
+					$this->close($e->getCode());
 				}
 
-				return 'saved' . $article->title;
+				//$this->close('Storing ' . $article->title . ' done' . "\n", true);
+
+				/*
+				try
+				{
+					$this->out('Saving ' . $article->title, true);
+
+					$article->save(true);
+				} catch (RuntimeException $e)
+				{
+					$this->out('Saving ' . $article->title . ' failed', true);
+
+					$this->out($e->getMessage(), true);
+					$this->close($e->getCode());
+				}
+
+				$this->out('Saving ' . $article->title . ' done', true);
+				*/
 			}
 		}
 	}
-
 }
 
 // Instantiate the application object, passing the class name to JCli::getInstance
