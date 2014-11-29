@@ -70,8 +70,14 @@ class ImportwordpressCli extends JApplicationCli
 	 */
 	public function execute()
 	{
-		$xml = $this->getFeed('http://www.winkworth.co.uk/property-blog/feed/');
-		$this->saveItems($xml, 2);
+		// Test of using config file
+		include_once('import_config.php');
+
+		foreach ($config as $url => $catdid)
+		{
+			$xml = $this->getFeed($url . '/feed');
+			$this->saveItems($xml, 2);
+		}
 	}
 
 	/**
@@ -106,6 +112,13 @@ class ImportwordpressCli extends JApplicationCli
 		return $id;
 	}
 
+	/**
+	 * Retrieves the feed
+	 *
+	 * @param $url
+	 *
+	 * @return SimpleXMLElement
+	 */
 	private function getFeed($url)
 	{
 		$curl = curl_init();
@@ -124,6 +137,12 @@ class ImportwordpressCli extends JApplicationCli
 		return $xml;
 	}
 
+	/**
+	 * Saves each non-duplicated item as a Joomla article
+	 *
+	 * @param $xml
+	 * @param $catId
+	 */
 	private function saveItems($xml, $catId)
 	{
 		$query = $this->db->getQuery(true);
