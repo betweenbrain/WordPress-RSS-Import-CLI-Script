@@ -1,4 +1,4 @@
-## WordPress-RSS-Import-CLI-Script
+## WordPress RSS Import CLI Script
 
 A Joomla CLI script to import WordPress RSS feeds as articles.
 
