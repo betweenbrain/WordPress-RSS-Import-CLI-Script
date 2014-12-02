@@ -45,6 +45,23 @@ class ImportwordpressCli extends JApplicationCli
 {
 
 	/**
+	 * @var null
+	 */
+	private $csvData = null;
+
+	/**
+	 * The URL of the CSV file to import
+	 *
+	 * @var null
+	 */
+	private $csvUrl = null;
+
+	/**
+	 * @var null
+	 */
+	private $columnMap = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param   object &$subject The object to observe
@@ -59,6 +76,24 @@ class ImportwordpressCli extends JApplicationCli
 
 		// Set JFactory::$application object to avoid system using incorrect defaults
 		JFactory::$application = $this;
+
+		$this->csvUrl    = 'https://docs.google.com/spreadsheets/d/1kjHIIGag094UaSPgUsHL6nIgCHX3X2SUPYo3abD9eCk/export?format=csv';
+		$csvData         = $this->readCSVFile($this->csvUrl);
+		$this->columnMap = $this->mapColumnNames($csvData);
+		array_shift($csvData);
+		$this->csvData = $csvData;
+	}
+
+	/**
+	 * Parses the guid to return the post ID
+	 *
+	 * @param $item
+	 *
+	 * @return mixed
+	 */
+	private function postId($item)
+	{
+		return end(explode('?p=', $item->guid));
 	}
 
 	/**
@@ -70,14 +105,26 @@ class ImportwordpressCli extends JApplicationCli
 	 */
 	public function execute()
 	{
-		// Test of using config file
-		include_once('import_config.php');
 
-		foreach ($config as $url => $catdid)
+		// $this->out(print_r($this->columnMap, true));
+
+		$this->out(JProfiler::getInstance('Application')->mark('Starting import.'));
+
+		// $this->out(print_r($this->csvData));
+
+		foreach ($this->csvData as $feed)
 		{
-			$xml = $this->getFeed($url . '/feed');
-			$this->saveItems($xml, 2);
+			// $this->out(print_r($feeds[$this->columnMap->feedUrl], true));
+
+			$xml = simplexml_load_file($feed[$this->columnMap->feedUrl], 'SimpleXMLElement', LIBXML_NOCDATA);
+
+			foreach ($xml->channel->item as $item)
+			{
+				$this->save($item, $feed[$this->columnMap->categoryId]);
+			}
 		}
+
+		$this->out(JProfiler::getInstance('Application')->mark('Finished import.'));
 	}
 
 	/**
@@ -113,28 +160,71 @@ class ImportwordpressCli extends JApplicationCli
 	}
 
 	/**
-	 * Retrieves the feed
+	 * Checks if an article already exists based on the article alias derived from the column "name"
 	 *
-	 * @param $url
+	 * @param $article
 	 *
-	 * @return SimpleXMLElement
+	 * @return bool
 	 */
-	private function getFeed($url)
+	private function isDuplicate($xref)
 	{
-		$curl = curl_init();
-		curl_setopt_array($curl, Array(
-			CURLOPT_URL            => $url,
-			CURLOPT_USERAGENT      => 'spider',
-			CURLOPT_TIMEOUT        => 120,
-			CURLOPT_CONNECTTIMEOUT => 30,
-			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_ENCODING       => 'UTF-8'
-		));
-		$data = curl_exec($curl);
-		curl_close($curl);
-		$xml = simplexml_load_string($data, 'SimpleXMLElement', LIBXML_NOCDATA);
+		$query = $this->db->getQuery(true);
+		$query
+			->select($this->db->quoteName('id'))
+			->from($this->db->quoteName('#__content'))
+			->where($this->db->quoteName('xreference') . ' = ' . $this->db->quote($xref));
+		$this->db->setQuery($query);
 
-		return $xml;
+		return $this->db->loadResult() ? true : false;
+	}
+
+	/**
+	 * Read the first row of a CSV to create a name based mapping of column values
+	 *
+	 * @param $csvfile
+	 *
+	 * @return mixed
+	 */
+	private function mapColumnNames($csvfile)
+	{
+		$return = new stdClass;
+		foreach ($csvfile[0] as $key => $value)
+		{
+			$return->{$this->camelCase($value)} = $key;
+		}
+
+		return $return;
+	}
+
+	/**
+	 *
+	 * @param $string
+	 *
+	 * @return mixed|string
+	 */
+	private function camelCase($string)
+	{
+
+		// Make sure that all words are upper case, but other letters lower
+		$str = ucwords(strtolower($string));
+
+		// Remove any duplicate whitespace, and ensure all characters are alphanumeric
+		$str = preg_replace('/[^A-Za-z0-9]/', '', $str);
+
+		// Trim whitespace and lower case first String
+		$str = trim(lcfirst($str));
+
+		return $str;
+	}
+
+	/**
+	 * Read a CSV file and return it as a multidimensional array
+	 *
+	 * @return array
+	 */
+	public function readCSVFile($fileName)
+	{
+		return array_map('str_getcsv', file($fileName));
 	}
 
 	/**
@@ -143,77 +233,54 @@ class ImportwordpressCli extends JApplicationCli
 	 * @param $xml
 	 * @param $catId
 	 */
-	private function saveItems($xml, $catId)
+	private function save($item, $catId)
 	{
-		$query = $this->db->getQuery(true);
-		$query
-			->select($this->db->quoteName('title'))
-			->from($this->db->quoteName('#__content'))
-			->where(
-				$this->db->quoteName('catid') . ' = ' . $catId . ' AND ' .
-				$this->db->quoteName('state') . ' = 1');
-		$this->db->setQuery($query);
-		$articles = $this->db->loadObjectList();
 
-		foreach ($xml->channel->item as $item)
+		// The item being imported is not a duplicate
+		if (!$this->isDuplicate($item->guid))
 		{
 
-			$duplicate = false;
+			$article = JTable::getInstance('content', 'JTable');
+			$creator = $item->children('dc', true);
+			$date    = JFactory::getDate($item->pubDate);
 
-			// Check for duplicates between those being imported and those already saved
-			foreach ($articles as $article)
+			$article->access           = 1;
+			$article->alias            = JFilterOutput::stringURLSafe($item->title);
+			$article->catid            = $catId;
+			$article->created          = $date->toSQL();
+			$article->created_by       = $this->getAdminId();
+			$article->created_by_alias = (string) $creator;
+			$article->introtext        = (string) $item->description;
+			$article->language         = '*';
+			$article->metadata         = '{"robots":"","author":"","rights":"","xreference":"","tags":null}';
+			$article->publish_up       = JFactory::getDate()->toSql();
+			$article->publish_down     = $this->db->getNullDate();
+			$article->state            = 1;
+			$article->title            = (string) $item->title[0];
+			$article->xreference       = (string) $item->guid;
+
+			try
 			{
-				if ($article->title == $item->title)
-				{
-					$duplicate = true;
-				}
+				$article->check();
+			} catch (RuntimeException $e)
+			{
+				$this->out($e->getMessage(), true);
+				$this->close($e->getCode());
+			}
+			try
+			{
+				$article->store(true);
+			} catch (RuntimeException $e)
+			{
+				$this->out($e->getMessage(), true);
+				$this->close($e->getCode());
 			}
 
-			// The item being imported is not a duplicate
-			if (!$duplicate)
-			{
-
-				$this->out('Processing ' . (string) $item->title);
-
-				$table = JTable::getInstance('content', 'JTable');
-
-				//return print_r($item, true);
-
-				$creator = $item->children('dc', true);
-				$date    = JFactory::getDate($item->pubDate);
-
-				$article = array(
-					'access'           => 1,
-					'alias'            => JFilterOutput::stringURLSafe($item->title),
-					'catid'            => $catId,
-					'created'          => $date->toSQL(),
-					'created_by'       => $this->getAdminId(),
-					'created_by_alias' => (string) $creator,
-					'introtext'        => (string) $item->description,
-					'language'         => '*',
-					'metadata'         => '{"robots":"","author":"","rights":"","xreference":"","tags":null}',
-					'publish_up'       => JFactory::getDate()->toSql(),
-					'publish_down'     => $this->db->getNullDate(),
-					'state'            => 1,
-					'title'            => (string) $item->title[0],
-					'version'          => 1
-				);
-
-				try
-				{
-					$this->out('Saving ' . $article['title'], true);
-
-					$table->save($article);
-				} catch (RuntimeException $e)
-				{
-					$this->out('Saving ' . $article['title'] . ' failed', true);
-
-					$this->out($e->getMessage(), true);
-					$this->close($e->getCode());
-				}
-
-				$this->out('Saving ' . $article['title'] . ' done', true);
-			}
+			$this->out('');
+			$this->out((string) $item->title[0]);
+			$this->out('Post ID: ' . $this->postId($item));
+			$this->out('Article ID: ' . $article->id);
+			$this->out('');
 		}
 	}
 }
