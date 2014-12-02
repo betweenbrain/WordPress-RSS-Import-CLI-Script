@@ -106,16 +106,13 @@ class ImportwordpressCli extends JApplicationCli
 	public function execute()
 	{
 
-		// $this->out(print_r($this->columnMap, true));
-
-		$this->out(JProfiler::getInstance('Application')->mark('Starting import.'));
-
-		// $this->out(print_r($this->csvData));
+		if ($this->input->get('v'))
+		{
+			$this->out(JProfiler::getInstance('Application')->mark('Starting import.'));
+		}
 
 		foreach ($this->csvData as $feed)
 		{
-			// $this->out(print_r($feeds[$this->columnMap->feedUrl], true));
-
 			$xml = simplexml_load_file($feed[$this->columnMap->feedUrl], 'SimpleXMLElement', LIBXML_NOCDATA);
 
 			foreach ($xml->channel->item as $item)
@@ -124,7 +121,10 @@ class ImportwordpressCli extends JApplicationCli
 			}
 		}
 
-		$this->out(JProfiler::getInstance('Application')->mark('Finished import.'));
+		if ($this->input->get('v'))
+		{
+			$this->out(JProfiler::getInstance('Application')->mark('Finished import.'));
+		}
 	}
 
 	/**
@@ -276,11 +276,10 @@ class ImportwordpressCli extends JApplicationCli
 				$this->close($e->getCode());
 			}
 
-			$this->out('');
-			$this->out((string) $item->title[0]);
-			$this->out('Post ID: ' . $this->postId($item));
-			$this->out('Article ID: ' . $article->id);
-			$this->out('');
+			if ($this->input->get('v'))
+			{
+				$this->out(JFactory::getDate('now')->toSQL() . ': Saved new article "' . $article->title . '", WordPress post ID ' . $this->postId($item) . ', article ID ' . $article->id);
+			}
 		}
 	}
 }
