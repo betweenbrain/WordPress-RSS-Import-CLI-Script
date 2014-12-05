@@ -171,7 +171,12 @@ class ImportwordpressCli extends JApplicationCli
 		include_once dirname(__FILE__) . '/simple_html_dom.php';
 		$html = file_get_html($url);
 
-		return $html->find('.entry-body', 0)->innertext;
+		foreach ($html->find('.entry-content') as $entry)
+		{
+			$content[] = $entry->innertext;
+		}
+
+		return implode("\n", $content);
 	}
 
 	/**
@@ -257,7 +262,6 @@ class ImportwordpressCli extends JApplicationCli
 
 			if (strpos($item->description, 'class="read-more"'))
 			{
-				$this->out($item->title);
 				$item->description = $this->getFullText($item->guid);
 			}
 
