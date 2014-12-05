@@ -160,6 +160,21 @@ class ImportwordpressCli extends JApplicationCli
 	}
 
 	/**
+	 * Use PHP Simple HTML DOM Parser to get the post fulltext
+	 *
+	 * @param $url
+	 *
+	 * @return mixed
+	 */
+	private function getFullText($url)
+	{
+		include_once dirname(__FILE__) . '/simple_html_dom.php';
+		$html = file_get_html($url);
+
+		return $html->find('.entry-body', 0)->innertext;
+	}
+
+	/**
 	 * Checks if an article already exists based on the article alias derived from the column "name"
 	 *
 	 * @param $article
@@ -239,6 +254,12 @@ class ImportwordpressCli extends JApplicationCli
 		// The item being imported is not a duplicate
 		if (!$this->isDuplicate($item->guid))
 		{
+
+			if (strpos($item->description, 'class="read-more"'))
+			{
+				$this->out($item->title);
+				$item->description = $this->getFullText($item->guid);
+			}
 
 			$article = JTable::getInstance('content', 'JTable');
 			$creator = $item->children('dc', true);
