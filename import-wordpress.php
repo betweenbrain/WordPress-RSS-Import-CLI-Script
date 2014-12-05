@@ -303,7 +303,7 @@ class ImportwordpressCli extends JApplicationCli
 
 			if ($this->input->get('v'))
 			{
-				$this->out(JFactory::getDate('now')->toSQL() . ': Saved new article "' . $article->title . '", WordPress post ID ' . $this->postId($item) . ', article ID ' . $article->id);
+				$this->out(date("Y-m-d H:i:s") . ': Saved new article "' . $article->title . '", WordPress post ID ' . $this->postId($item) . ', article ID ' . $article->id);
 			}
 		}
 	}
