@@ -292,6 +292,7 @@ class ImportwordpressCli extends JApplicationCli
 				$this->out($e->getMessage(), true);
 				$this->close($e->getCode());
 			}
+
 			try
 			{
 				$article->store(true);
