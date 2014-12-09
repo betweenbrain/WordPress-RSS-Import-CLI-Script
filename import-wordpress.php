@@ -224,9 +224,11 @@ class ImportwordpressCli extends JApplicationCli
 	 */
 	private function camelCase($string)
 	{
+		// Process any already camel cased strings
+		$str = preg_replace('/([A-Z])/', ' $1', $string);
 
 		// Make sure that all words are upper case, but other letters lower
-		$str = ucwords(strtolower($string));
+		$str = ucwords(strtolower($str));
 
 		// Remove any duplicate whitespace, and ensure all characters are alphanumeric
 		$str = preg_replace('/[^A-Za-z0-9]/', '', $str);
